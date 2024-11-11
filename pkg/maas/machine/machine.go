@@ -2,14 +2,16 @@ package machine
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
-	"github.com/spectrocloud/cluster-api-provider-maas/pkg/maas/scope"
 	"github.com/spectrocloud/maas-client-go/maasclient"
 	"k8s.io/klog/v2/textlogger"
 
-	infrav1beta1 "github.com/spectrocloud/cluster-api-provider-maas/api/v1beta1"
+	"github.com/spectrocloud/cluster-api-provider-maas/pkg/maas/scope"
+
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
+
+	infrav1beta1 "github.com/spectrocloud/cluster-api-provider-maas/api/v1beta1"
 )
 
 // Service manages the MaaS machine
@@ -18,7 +20,7 @@ type Service struct {
 	maasClient maasclient.ClientSetInterface
 }
 
-// DNS service returns a new helper for managing a MaaS "DNS" (DNS client loadbalancing)
+// NewService returns a new helper for managing a MaaS "DNS" (DNS client loadbalancing)
 func NewService(machineScope *scope.MachineScope) *Service {
 	return &Service{
 		scope:      machineScope,
@@ -45,7 +47,7 @@ func (s *Service) ReleaseMachine(systemID string) error {
 		Releaser().
 		Release(ctx)
 	if err != nil {
-		return errors.Wrapf(err, "Unable to release machine")
+		return fmt.Errorf("unable to release machine: %w", err)
 	}
 
 	return nil
@@ -86,18 +88,18 @@ func (s *Service) DeployMachine(userDataB64 string) (_ *infrav1beta1.Machine, re
 
 		m, err = allocator.Allocate(ctx)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Unable to allocate machine")
+			return nil, fmt.Errorf("unable to allocate machine: %w", err)
 		}
 
 		s.scope.SetProviderID(m.SystemID(), m.Zone().Name())
 		err = s.scope.PatchObject()
 		if err != nil {
-			return nil, errors.Wrapf(err, "unable to pathc machine with provider id")
+			return nil, fmt.Errorf("unable to pathc machine with provider id: %w", err)
 		}
 	} else {
 		m, err = s.maasClient.Machines().Machine(*s.scope.GetInstanceID()).Get(ctx)
 		if err != nil {
-			return nil, errors.Wrapf(err, "unable to find machine %s", *s.scope.GetInstanceID())
+			return nil, fmt.Errorf("unable to find machine %s: %w", *s.scope.GetInstanceID(), err)
 		}
 	}
 
@@ -118,7 +120,7 @@ func (s *Service) DeployMachine(userDataB64 string) (_ *infrav1beta1.Machine, re
 	//Hostname: &mm.Name,
 	noSwap := 0
 	if _, err := m.Modifier().SetSwapSize(noSwap).Update(ctx); err != nil {
-		return nil, errors.Wrapf(err, "Unable to disable swap")
+		return nil, fmt.Errorf("unable to disable swap: %w", err)
 	}
 
 	s.scope.Info("Swap disabled", "system-id", m.SystemID())
@@ -128,7 +130,7 @@ func (s *Service) DeployMachine(userDataB64 string) (_ *infrav1beta1.Machine, re
 		SetOSSystem("custom").
 		SetDistroSeries(mm.Spec.Image).Deploy(ctx)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Unable to deploy machine")
+		return nil, fmt.Errorf("unable to deploy machine: %w", err)
 	}
 
 	return fromSDKTypeToMachine(deployingM), nil

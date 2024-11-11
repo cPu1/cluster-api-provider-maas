@@ -20,11 +20,11 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/tools/record"
@@ -74,10 +74,7 @@ func (r *MaasMachineReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	maasMachine := &infrav1beta1.MaasMachine{}
 	err := r.Get(ctx, req.NamespacedName, maasMachine)
 	if err != nil {
-		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
-		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// Fetch the Machine.
@@ -218,7 +215,7 @@ func (r *MaasMachineReconciler) findMachine(machineScope *scope.MachineScope, ma
 
 	m, err := machineSvc.GetMachine(*id)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Unable to find machine")
+		return nil, fmt.Errorf("unable to find machine: %w", err)
 	}
 
 	return m, nil
@@ -301,12 +298,12 @@ func (r *MaasMachineReconciler) reconcileNormal(_ context.Context, machineScope 
 		r.Recorder.Eventf(machineScope.MaasMachine, corev1.EventTypeWarning, "MachineUnexpectedTermination", "Unexpected Maas m termination")
 		conditions.MarkFalse(machineScope.MaasMachine, infrav1beta1.MachineDeployedCondition, infrav1beta1.MachineTerminatedReason, clusterv1.ConditionSeverityError, "")
 		machineScope.SetFailureReason(capierrors.UpdateMachineError)
-		machineScope.SetFailureMessage(errors.Errorf("Maas machine state %q is unexpected", m.State))
+		machineScope.SetFailureMessage(fmt.Errorf("Maas machine state %q is unexpected", m.State))
 	case machineScope.MachineIsInKnownState() && !m.Powered:
 		if *machineScope.GetMachineState() == infrav1beta1.MachineStateDeployed {
 			machineScope.Info("Deployed machine is powered off trying power on")
 			if err := machineSvc.PowerOnMachine(); err != nil {
-				return ctrl.Result{}, errors.Wrap(err, "unable to power on deployed machine")
+				return ctrl.Result{}, fmt.Errorf("unable to power on deployed machine: %w", err)
 			}
 
 			return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
@@ -326,7 +323,7 @@ func (r *MaasMachineReconciler) reconcileNormal(_ context.Context, machineScope 
 		machineScope.Info("MaaS m state is undefined", "state", m.State)
 		r.Recorder.Eventf(machineScope.MaasMachine, corev1.EventTypeWarning, "MachineUnhandledState", "MaaS m state is undefined")
 		machineScope.SetFailureReason(capierrors.UpdateMachineError)
-		machineScope.SetFailureMessage(errors.Errorf("MaaS m state %q is undefined", m.State))
+		machineScope.SetFailureMessage(fmt.Errorf("MaaS m state %q is undefined", m.State))
 		conditions.MarkUnknown(machineScope.MaasMachine, infrav1beta1.MachineDeployedCondition, "", "")
 	}
 
@@ -371,12 +368,12 @@ func (r *MaasMachineReconciler) deployMachine(machineScope *scope.MachineScope, 
 
 	userDataB64, userDataErr := r.resolveUserData(machineScope)
 	if userDataErr != nil {
-		return nil, errors.Wrapf(userDataErr, "failed to resolve userdata")
+		return nil, fmt.Errorf("failed to resolve userdata: %w", userDataErr)
 	}
 
 	m, err := machineSvc.DeployMachine(userDataB64)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to deploy MaasMachine instance")
+		return nil, fmt.Errorf("failed to deploy MaasMachine instance: %w", err)
 	}
 
 	return m, nil
@@ -407,7 +404,7 @@ func (r *MaasMachineReconciler) reconcileDNSAttachment(machineScope *scope.Machi
 		if err != nil {
 			//r.Recorder.Eventf(machineScope.MaasMachine, corev1.EventTypeWarning, "FailedDetachControlPlaneDNS",
 			//	"Failed to deregister control plane instance %q from DNS: failed to determine registration status: %v", m.ID, err)
-			return errors.Wrapf(err, "machine %q - error determining registration status", m.ID)
+			return fmt.Errorf("machine %q - error determining registration status: %w", m.ID, err)
 		}
 
 		machineScope.MaasMachine.Status.DNSAttached = registered
@@ -427,7 +424,7 @@ func (r *MaasMachineReconciler) reconcileDNSAttachment(machineScope *scope.Machi
 	if err != nil {
 		//r.Recorder.Eventf(machineScope.MaasMachine, corev1.EventTypeWarning, "FailedAttachControlPlaneELB",
 		//	"Failed to register control plane instance %q with load balancer: failed to determine registration status: %v", i.ID, err)
-		return errors.Wrapf(err, "normal machine %q - error determining registration status", m.ID)
+		return fmt.Errorf("normal machine %q - error determining registration status: %w", m.ID, err)
 	}
 
 	machineScope.MaasMachine.Status.DNSAttached = registered

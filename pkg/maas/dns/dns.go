@@ -2,11 +2,14 @@ package dns
 
 import (
 	"context"
-	"github.com/pkg/errors"
-	infrainfrav1beta1 "github.com/spectrocloud/cluster-api-provider-maas/api/v1beta1"
-	"github.com/spectrocloud/cluster-api-provider-maas/pkg/maas/scope"
+	"errors"
+	"fmt"
+
 	"github.com/spectrocloud/maas-client-go/maasclient"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	infrainfrav1beta1 "github.com/spectrocloud/cluster-api-provider-maas/api/v1beta1"
+	"github.com/spectrocloud/cluster-api-provider-maas/pkg/maas/scope"
 )
 
 type Service struct {
@@ -16,7 +19,7 @@ type Service struct {
 
 var ErrNotFound = errors.New("resource not found")
 
-// DNS service returns a new helper for managing a MaaS "DNS" (DNS client loadbalancing)
+// NewService returns a new helper for managing a MaaS "DNS" (DNS client loadbalancing)
 func NewService(clusterScope *scope.ClusterScope) *Service {
 	return &Service{
 		scope:      clusterScope,
@@ -43,7 +46,7 @@ func (s *Service) ReconcileDNS() error {
 			WithAddressTTL("10").
 			WithIPAddresses(nil).
 			Create(ctx); err != nil {
-			return errors.Wrapf(err, "Unable to create DNS Resources")
+			return fmt.Errorf("unable to create DNS Resources: %w", err)
 		}
 	}
 
@@ -52,7 +55,7 @@ func (s *Service) ReconcileDNS() error {
 	return nil
 }
 
-// UpdateAttachments reconciles the load balancers for the given cluster.
+// UpdateDNSAttachments reconciles the load balancers for the given cluster.
 func (s *Service) UpdateDNSAttachments(IPs []string) error {
 	s.scope.V(2).Info("Updating DNS Attachments")
 	ctx := context.TODO()
@@ -63,7 +66,7 @@ func (s *Service) UpdateDNSAttachments(IPs []string) error {
 	}
 
 	if _, err = dnsResource.Modifier().SetIPAddresses(IPs).Modify(ctx); err != nil {
-		return errors.Wrap(err, "Unable to update IPs")
+		return fmt.Errorf("unable to update IPs: %w", err)
 	}
 
 	return nil
@@ -128,9 +131,9 @@ func (s *Service) GetDNSResource() (maasclient.DNSResource, error) {
 		List(context.Background(),
 			maasclient.ParamsBuilder().Set(maasclient.FQDNKey, dnsName))
 	if err != nil {
-		return nil, errors.Wrapf(err, "error retrieving dns resources %q", dnsName)
+		return nil, fmt.Errorf("error retrieving dns resources %q: %w", dnsName, err)
 	} else if len(d) > 1 {
-		return nil, errors.Errorf("expected 1 DNS Resource for %q, got %d", dnsName, len(d))
+		return nil, fmt.Errorf("expected 1 DNS Resource for %q, got %d", dnsName, len(d))
 	} else if len(d) == 0 {
 		return nil, ErrNotFound
 	}

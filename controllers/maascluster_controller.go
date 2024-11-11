@@ -18,13 +18,13 @@ package controllers
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
@@ -67,10 +67,7 @@ func (r *MaasClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	// Fetch the MaasCluster instance
 	maasCluster := &infrav1beta1.MaasCluster{}
 	if err := r.Client.Get(ctx, req.NamespacedName, maasCluster); err != nil {
-		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
-		}
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 	// Fetch the Cluster.
 	cluster, err := util.GetOwnerCluster(ctx, r.Client, maasCluster.ObjectMeta)
@@ -93,7 +90,7 @@ func (r *MaasClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		Tracker:             r.Tracker,
 	})
 	if err != nil {
-		return reconcile.Result{}, errors.Errorf("failed to create scope: %+v", err)
+		return reconcile.Result{}, fmt.Errorf("failed to create scope: %+v", err)
 	}
 
 	// Always close the scope when exiting this function so we can persist any MAAS Cluster changes.
@@ -130,8 +127,8 @@ func (r *MaasClusterReconciler) reconcileDelete(ctx context.Context, clusterScop
 
 	maasMachines, err := infrautil.GetMAASMachinesInCluster(ctx, r.Client, clusterScope.Cluster.Namespace, clusterScope.Cluster.Name)
 	if err != nil {
-		return reconcile.Result{}, errors.Wrapf(err,
-			"unable to list MAASMachines part of MAASCluster %s/%s", clusterScope.Cluster.Namespace, clusterScope.Cluster.Name)
+		return reconcile.Result{}, fmt.Errorf(
+			"unable to list MAASMachines part of MAASCluster %s/%s: %w", clusterScope.Cluster.Namespace, clusterScope.Cluster.Name, err)
 	}
 
 	if len(maasMachines) > 0 {
@@ -150,14 +147,14 @@ func (r *MaasClusterReconciler) reconcileDelete(ctx context.Context, clusterScop
 func (r *MaasClusterReconciler) reconcileDNSAttachments(clusterScope *scope.ClusterScope, dnssvc *dns.Service) error {
 	machines, err := clusterScope.GetClusterMaasMachines()
 	if err != nil {
-		return errors.Wrapf(err, "Unable to list all maas machines")
+		return fmt.Errorf("unable to list all maas machines: %w", err)
 	}
 
 	var runningIpAddresses []string
 
 	currentIPs, err := dnssvc.GetAPIServerDNSRecords()
 	if err != nil {
-		return errors.Wrap(err, "Unable to get the dns resources")
+		return fmt.Errorf("unable to get the dns resources: %w", err)
 	}
 
 	machinesPendingAttachment := make([]*infrav1beta1.MaasMachine, 0)

@@ -24,15 +24,14 @@ import (
 	"path"
 	"path/filepath"
 	goruntime "runtime"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	webhookserver "sigs.k8s.io/controller-runtime/pkg/webhook"
 	"strconv"
 	"strings"
 	"time"
 
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	webhookserver "sigs.k8s.io/controller-runtime/pkg/webhook"
+
 	"github.com/onsi/ginkgo"
-	"github.com/pkg/errors"
-	"github.com/spectrocloud/cluster-api-provider-maas/test/helpers/external"
 	admissionv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
@@ -48,6 +47,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	"github.com/spectrocloud/cluster-api-provider-maas/test/helpers/external"
 
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/cmd/clusterctl/log"
@@ -222,11 +223,11 @@ func buildModifiedWebhook(tag string, relativeFilePath string) (admissionv1.Muta
 	var validatingWebhook admissionv1.ValidatingWebhookConfiguration
 	data, err := os.ReadFile(filepath.Clean(filepath.Join(root, relativeFilePath)))
 	if err != nil {
-		return mutatingWebhook, validatingWebhook, errors.Wrap(err, "failed to read webhook configuration file")
+		return mutatingWebhook, validatingWebhook, fmt.Errorf("failed to read webhook configuration file: %w", err)
 	}
 	objs, err := utilyaml.ToUnstructured(data)
 	if err != nil {
-		return mutatingWebhook, validatingWebhook, errors.Wrap(err, "failed to parse yaml")
+		return mutatingWebhook, validatingWebhook, fmt.Errorf("failed to parse yaml: %w", err)
 	}
 	for i := range objs {
 		o := objs[i]

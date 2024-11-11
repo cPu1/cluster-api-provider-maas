@@ -18,11 +18,13 @@ package scope
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
+	"time"
+
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
-	infrav1beta1 "github.com/spectrocloud/cluster-api-provider-maas/api/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -33,8 +35,8 @@ import (
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
-	"sync"
-	"time"
+
+	infrav1beta1 "github.com/spectrocloud/cluster-api-provider-maas/api/v1beta1"
 )
 
 const (
@@ -71,7 +73,7 @@ func NewClusterScope(params ClusterScopeParams) (*ClusterScope, error) {
 
 	helper, err := patch.NewHelper(params.MaasCluster, params.Client)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to init patch helper")
+		return nil, fmt.Errorf("failed to init patch helper: %w", err)
 	}
 	return &ClusterScope{
 		Logger:              params.Logger,
@@ -156,7 +158,7 @@ func (s *ClusterScope) GetClusterMaasMachines() ([]*infrav1beta1.MaasMachine, er
 		machineList,
 		client.InNamespace(s.Cluster.Namespace),
 		client.MatchingLabels(labels)); err != nil {
-		return nil, errors.Wrap(err, "failed to list machines")
+		return nil, fmt.Errorf("failed to list machines: %w", err)
 	}
 
 	var machines []*infrav1beta1.MaasMachine

@@ -18,10 +18,10 @@ package scope
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/utils/ptr"
@@ -71,7 +71,7 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 
 	helper, err := patch.NewHelper(params.MaasMachine, params.Client)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to init patch helper")
+		return nil, fmt.Errorf("failed to init patch helper: %w", err)
 	}
 	return &MachineScope{
 		Logger:         params.Logger,
@@ -248,7 +248,7 @@ func (m *MachineScope) GetRawBootstrapData() ([]byte, error) {
 	secret := &corev1.Secret{}
 	key := types.NamespacedName{Namespace: namespace, Name: *m.Machine.Spec.Bootstrap.DataSecretName}
 	if err := m.client.Get(context.TODO(), key, secret); err != nil {
-		return nil, errors.Wrapf(err, "failed to retrieve bootstrap data secret for MaasMachine %s/%s", namespace, m.Machine.Name)
+		return nil, fmt.Errorf("failed to retrieve bootstrap data secret for MaasMachine %s/%s: %w", namespace, m.Machine.Name, err)
 	}
 
 	value, ok := secret.Data["value"]
