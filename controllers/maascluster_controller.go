@@ -210,7 +210,7 @@ func IsRunning(m *infrav1beta1.MaasMachine) bool {
 	}
 
 	state := m.Status.MachineState
-	return state != nil && infrav1beta1.MachineRunningStates.Has(string(*state))
+	return state != nil && infrav1beta1.MachineRunningStates.Has(*state)
 }
 
 func getExternalMachineIP(machine *infrav1beta1.MaasMachine) string {
@@ -228,8 +228,7 @@ func (r *MaasClusterReconciler) reconcileNormal(_ context.Context, clusterScope 
 	maasCluster := clusterScope.MaasCluster
 
 	// Add finalizer first if not exist to avoid the race condition between init and delete
-	if !controllerutil.ContainsFinalizer(maasCluster, infrav1beta1.ClusterFinalizer) {
-		controllerutil.AddFinalizer(maasCluster, infrav1beta1.ClusterFinalizer)
+	if controllerutil.AddFinalizer(maasCluster, infrav1beta1.ClusterFinalizer) {
 		return ctrl.Result{}, nil
 	}
 

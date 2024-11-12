@@ -224,17 +224,17 @@ func (m *MachineScope) SetMachineHostname(hostname string) {
 
 func (m *MachineScope) MachineIsRunning() bool {
 	state := m.GetMachineState()
-	return state != nil && infrav1beta1.MachineRunningStates.Has(string(*state))
+	return state != nil && infrav1beta1.MachineRunningStates.Has(*state)
 }
 
 func (m *MachineScope) MachineIsOperational() bool {
 	state := m.GetMachineState()
-	return state != nil && infrav1beta1.MachineOperationalStates.Has(string(*state))
+	return state != nil && infrav1beta1.MachineOperationalStates.Has(*state)
 }
 
 func (m *MachineScope) MachineIsInKnownState() bool {
 	state := m.GetMachineState()
-	return state != nil && infrav1beta1.MachineKnownStates.Has(string(*state))
+	return state != nil && infrav1beta1.MachineKnownStates.Has(*state)
 }
 
 // GetRawBootstrapData returns the bootstrap data from the secret in the Machine's bootstrap.dataSecretName.
