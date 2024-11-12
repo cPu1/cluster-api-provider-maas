@@ -26,7 +26,7 @@ var (
 	// MachineStateDiskErasing is the string representing an instance which is releasing (disk)
 	MachineStateDiskErasing = MachineState("Disk erasing")
 
-	// MachineStateDiskErasing is the string representing an instance which is releasing
+	// MachineStateReleasing represents an instance which is being released.
 	MachineStateReleasing = MachineState("Releasing")
 
 	// MachineStateNew is the string representing an instance which is not yet commissioned
@@ -48,32 +48,30 @@ var (
 
 	// MachineRunningStates defines the set of states in which an MaaS instance is
 	// running or going to be running soon
-	MachineRunningStates = sets.NewString(
-		string(MachineStateDeploying),
-		string(MachineStateDeployed),
+	MachineRunningStates = sets.New(
+		MachineStateDeploying,
+		MachineStateDeployed,
 	)
 
 	// MachineOperationalStates defines the set of states in which an MaaS instance is
 	// or can return to running, and supports all MaaS operations
 	MachineOperationalStates = MachineRunningStates.Union(
-		sets.NewString(
-			string(MachineStateAllocated),
-		),
+		sets.New(MachineStateAllocated),
 	)
 
 	// MachineKnownStates represents all known MaaS instance states
 	MachineKnownStates = MachineOperationalStates.Union(
-		sets.NewString(
-			string(MachineStateDiskErasing),
-			string(MachineStateReleasing),
-			string(MachineStateReady),
-			string(MachineStateNew),
+		sets.New(
+			MachineStateDiskErasing,
+			MachineStateReleasing,
+			MachineStateReady,
+			MachineStateNew,
 			//string(MachineStateTerminated),
 		),
 	)
 )
 
-// Instance describes an MAAS Machine.
+// Machine describes a MAAS Machine.
 type Machine struct {
 	ID string
 

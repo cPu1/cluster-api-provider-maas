@@ -18,13 +18,13 @@ package scope
 
 import (
 	"context"
+	"errors"
 	"fmt"
+
 	"github.com/go-logr/logr"
-	"github.com/pkg/errors"
-	infrav1beta1 "github.com/spectrocloud/cluster-api-provider-maas/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/utils/pointer"
+	"k8s.io/utils/ptr"
 	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/controllers/remote"
 	capierrors "sigs.k8s.io/cluster-api/errors"
@@ -32,6 +32,8 @@ import (
 	"sigs.k8s.io/cluster-api/util/conditions"
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	infrav1beta1 "github.com/spectrocloud/cluster-api-provider-maas/api/v1beta1"
 )
 
 // MachineScopeParams defines the input parameters used to create a new Scope.
@@ -69,7 +71,7 @@ func NewMachineScope(params MachineScopeParams) (*MachineScope, error) {
 
 	helper, err := patch.NewHelper(params.MaasMachine, params.Client)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to init patch helper")
+		return nil, fmt.Errorf("failed to init patch helper: %w", err)
 	}
 	return &MachineScope{
 		Logger:         params.Logger,
@@ -139,7 +141,7 @@ func (m *MachineScope) SetNotReady() {
 
 // SetFailureMessage sets the MaasMachine status failure message.
 func (m *MachineScope) SetFailureMessage(v error) {
-	m.MaasMachine.Status.FailureMessage = pointer.StringPtr(v.Error())
+	m.MaasMachine.Status.FailureMessage = ptr.To(v.Error())
 }
 
 // SetFailureReason sets the MaasMachine status failure reason.
@@ -177,17 +179,17 @@ func (m *MachineScope) GetProviderID() string {
 // SetProviderID sets the MaasMachine providerID in spec.
 func (m *MachineScope) SetProviderID(systemID, availabilityZone string) {
 	providerID := fmt.Sprintf("maas:///%s/%s", availabilityZone, systemID)
-	m.MaasMachine.Spec.ProviderID = pointer.StringPtr(providerID)
+	m.MaasMachine.Spec.ProviderID = ptr.To(providerID)
 }
 
 // SetFailureDomain sets the MaasMachine systemID in spec.
 func (m *MachineScope) SetFailureDomain(availabilityZone string) {
-	m.MaasMachine.Spec.FailureDomain = pointer.StringPtr(availabilityZone)
+	m.MaasMachine.Spec.FailureDomain = ptr.To(availabilityZone)
 }
 
-// SetInstanceID sets the MaasMachine systemID in spec.
+// SetSystemID sets the MaasMachine systemID in spec.
 func (m *MachineScope) SetSystemID(systemID string) {
-	m.MaasMachine.Spec.SystemID = pointer.StringPtr(systemID)
+	m.MaasMachine.Spec.SystemID = ptr.To(systemID)
 }
 
 func (m *MachineScope) GetSystemID() string {
@@ -207,7 +209,7 @@ func (m *MachineScope) SetPowered(powered bool) {
 	m.MaasMachine.Status.MachinePowered = powered
 }
 
-// GetMachineHostname retrns the hostname
+// GetMachineHostname returns the hostname
 func (m *MachineScope) GetMachineHostname() string {
 	if m.MaasMachine.Status.Hostname != nil {
 		return *m.MaasMachine.Status.Hostname
@@ -222,17 +224,17 @@ func (m *MachineScope) SetMachineHostname(hostname string) {
 
 func (m *MachineScope) MachineIsRunning() bool {
 	state := m.GetMachineState()
-	return state != nil && infrav1beta1.MachineRunningStates.Has(string(*state))
+	return state != nil && infrav1beta1.MachineRunningStates.Has(*state)
 }
 
 func (m *MachineScope) MachineIsOperational() bool {
 	state := m.GetMachineState()
-	return state != nil && infrav1beta1.MachineOperationalStates.Has(string(*state))
+	return state != nil && infrav1beta1.MachineOperationalStates.Has(*state)
 }
 
 func (m *MachineScope) MachineIsInKnownState() bool {
 	state := m.GetMachineState()
-	return state != nil && infrav1beta1.MachineKnownStates.Has(string(*state))
+	return state != nil && infrav1beta1.MachineKnownStates.Has(*state)
 }
 
 // GetRawBootstrapData returns the bootstrap data from the secret in the Machine's bootstrap.dataSecretName.
@@ -246,7 +248,7 @@ func (m *MachineScope) GetRawBootstrapData() ([]byte, error) {
 	secret := &corev1.Secret{}
 	key := types.NamespacedName{Namespace: namespace, Name: *m.Machine.Spec.Bootstrap.DataSecretName}
 	if err := m.client.Get(context.TODO(), key, secret); err != nil {
-		return nil, errors.Wrapf(err, "failed to retrieve bootstrap data secret for MaasMachine %s/%s", namespace, m.Machine.Name)
+		return nil, fmt.Errorf("failed to retrieve bootstrap data secret for MaasMachine %s/%s: %w", namespace, m.Machine.Name, err)
 	}
 
 	value, ok := secret.Data["value"]
