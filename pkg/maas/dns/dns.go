@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/spectrocloud/maas-client-go/maasclient"
 	"k8s.io/apimachinery/pkg/util/sets"
+	clusterv1 "sigs.k8s.io/cluster-api/api/v1beta1"
 
 	infrainfrav1beta1 "github.com/spectrocloud/cluster-api-provider-maas/api/v1beta1"
 	"github.com/spectrocloud/cluster-api-provider-maas/pkg/maas/scope"
@@ -89,29 +91,24 @@ func (s *Service) UpdateDNSAttachments(IPs []string) error {
 //
 //}
 
-// InstanceIsRegisteredWithAPIServerELB returns true if the instance is already registered with the APIServer ELB.
+// MachineIsRegisteredWithAPIServerDNS returns true if the instance is already registered with the APIServer ELB.
 func (s *Service) MachineIsRegisteredWithAPIServerDNS(i *infrainfrav1beta1.Machine) (bool, error) {
 	ips, err := s.GetAPIServerDNSRecords()
 	if err != nil {
 		return false, err
 	}
-
-	for _, mAddress := range i.Addresses {
-		if ips.Has(mAddress.Address) {
-			return true, nil
-		}
-	}
-
-	return false, nil
+	return slices.ContainsFunc(i.Addresses, func(address clusterv1.MachineAddress) bool {
+		return ips.Has(address.Address)
+	}), nil
 }
 
-func (s *Service) GetAPIServerDNSRecords() (sets.String, error) {
+func (s *Service) GetAPIServerDNSRecords() (sets.Set[string], error) {
 	dnsResource, err := s.GetDNSResource()
 	if err != nil {
 		return nil, err
 	}
 
-	ips := sets.NewString()
+	ips := sets.New[string]()
 	for _, address := range dnsResource.IPAddresses() {
 		if address.IP().String() != "" {
 			ips.Insert(address.IP().String())
@@ -124,7 +121,7 @@ func (s *Service) GetAPIServerDNSRecords() (sets.String, error) {
 func (s *Service) GetDNSResource() (maasclient.DNSResource, error) {
 	dnsName := s.scope.GetDNSName()
 	if dnsName == "" {
-		return nil, errors.New("No DNS on the cluster set!")
+		return nil, errors.New("no DNS on the cluster set")
 	}
 
 	d, err := s.maasClient.DNSResources().

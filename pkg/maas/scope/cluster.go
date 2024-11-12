@@ -232,7 +232,7 @@ func (s *ClusterScope) IsAPIServerOnline() (bool, error) {
 		return false, err
 	} else if !cluster.DeletionTimestamp.IsZero() {
 		s.Info("Cluster is deleting; abort APIServerOnline check", "cluster", cluster.Name)
-		return false, errors.New("Cluster is deleting; abort IsAPIServerOnline")
+		return false, errors.New("cluster is being deleted; abort IsAPIServerOnline")
 	}
 
 	remoteClient, err := s.tracker.GetClient(ctx, util.ObjectKey(s.Cluster))
